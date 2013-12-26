@@ -22,43 +22,117 @@ html,body,#map-canvas {
 	border: 1px solid #999;
 }
 </style>
+
 <script
 	src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=false"></script>
+
+<script src="lib/javascript.util.js"></script>
+<script src="lib/jsts.js"></script>
+<script src="lib/utm.js"></script>
 
 <script>
 	var directionsDisplay;
 	var directionsService = new google.maps.DirectionsService();
-	var map;	
+	var map;
+	var route;
 
 	function initialize() {
-		directionsDisplay = new google.maps.DirectionsRenderer({preserveViewport: true});
-		
+		directionsDisplay = new google.maps.DirectionsRenderer({
+			preserveViewport : true
+		});
+
 		var taquaral = new google.maps.LatLng(-22.865964, -47.054778);
 		var mapOptions = {
 			zoom : 16,
 			center : taquaral
 		}
-		
-		map = new google.maps.Map(document.getElementById('map-canvas'), mapOptions);
-		
+
+		map = new google.maps.Map(document.getElementById('map-canvas'),
+				mapOptions);
+
 		directionsDisplay.setMap(map);
-		
-		initializeOverlay();
-		
+
 		google.maps.event.addListener(map, 'mousemove', function(event) {
-			var positionPanel = document.getElementById('position_panel');
-			position_panel.innerHTML = event.latLng.toLocaleString();
-		}); 		
+			updatePositionInformation(event);
+		});
 
 	}
+
+	function updatePositionInformation(event) {
+		var positionPanel = document.getElementById('position_panel');
+		position_panel.innerHTML = event.latLng.toLocaleString();
+
+		if (!route) {
+			return;
+		}
+
+		position_panel.innerHTML += "<br />";
+		position_panel.innerHTML += routeInfo(event);
+	}
+
+	function routeInfo(event) {
+		var point = createPoint(event);
+		var polygon = createPolygon();
+		
+		var ptDist = new jsts.algorithm.distance.PointPairDistance();
+		jsts.algorithm.distance.DistanceToPoint.computeDistance(polygon, point.getCoordinate(), ptDist);
+				
+		return ptDist.getDistance();
+	}
+
+	function createPoint(event) {
+		var coordinates = toUTM(event.latLng.lat(), event.latLng.lng());
+				
+		/*
+		coordinates.push(event.latLng.lng());
+		coordinates.push(event.latLng.lat());*/
+		
+		geoInput = {
+				type : "Point",
+				coordinates : coordinates
+			};			
+		
+		var geoReader = new jsts.io.GeoJSONReader();
+		var geoWriter = new jsts.io.GeoJSONWriter();
+		
+		var geometry = geoReader.read(geoInput);/*.buffer(distance);*/
+		var point = geoWriter.write(geometry);
+		return geometry;
+	}
 	
-	function initializeOverlay() {
+	function createPolygon() {	
+		var overviewPath = route.overview_path;
+		var overviewPathGeo = [];
+		for (var i = 0; i < overviewPath.length; i++) {
+			/*
+			overviewPathGeo
+					.push([ overviewPath[i].lng(), overviewPath[i].lat() ]);*/
+			overviewPathGeo
+					.push(toUTM(overviewPath[i].lat(), overviewPath[i].lng()));
+		}		
+		
+		/* var distance = 10 / 111.12, // Roughly 10km */
+		
+		geoInput = {
+			type : "LineString",
+			coordinates : overviewPathGeo
+		};
+		
+		var geoReader = new jsts.io.GeoJSONReader();
+		var geoWriter = new jsts.io.GeoJSONWriter();
+		
+		var geometry = geoReader.read(geoInput);/*.buffer(distance);*/
+		var polygon = geoWriter.write(geometry);
+
+		return geometry;
 	}
 
 	function calcRoute() {
-		var start = /*document.getElementById('start').value;*/ new google.maps.LatLng(-22.866112, -47.062515);
-		var end = /*document.getElementById('end').value;*/ new google.maps.LatLng(-22.865914, -47.050971);
-		
+		var start = /*document.getElementById('start').value;*/new google.maps.LatLng(
+				-22.866112, -47.062515);
+		var end = /*document.getElementById('end').value;*/new google.maps.LatLng(
+				-22.865914, -47.050971);
+
 		/*
 		var waypts = [];
 		var checkboxArray = document.getElementById('waypoints');
@@ -78,20 +152,24 @@ html,body,#map-canvas {
 			optimizeWaypoints : true,*/
 			travelMode : google.maps.TravelMode.DRIVING
 		};
-		
+
 		directionsService.route(request, function(response, status) {
 			if (status == google.maps.DirectionsStatus.OK) {
 				directionsDisplay.setDirections(response);
-				var route = response.routes[0];
+				route = response.routes[0];
 				var summaryPanel = document.getElementById('directions_panel');
 				summaryPanel.innerHTML = '';
 				// For each route, display summary information.
 				for (var i = 0; i < route.legs.length; i++) {
 					var routeSegment = i + 1;
-					summaryPanel.innerHTML += '<b>Route Segment: ' + routeSegment + '</b><br>';
-					summaryPanel.innerHTML += route.legs[i].start_address + ' to ';
-					summaryPanel.innerHTML += route.legs[i].end_address	+ '<br>';
-					summaryPanel.innerHTML += route.legs[i].distance.text + '<br><br>';
+					summaryPanel.innerHTML += '<b>Route Segment: '
+							+ routeSegment + '</b><br>';
+					summaryPanel.innerHTML += route.legs[i].start_address
+							+ ' to ';
+					summaryPanel.innerHTML += route.legs[i].end_address
+							+ '<br>';
+					summaryPanel.innerHTML += route.legs[i].distance.text
+							+ '<br><br>';
 				}
 			}
 		});
@@ -103,7 +181,7 @@ html,body,#map-canvas {
 
 <body>
 	<div id="map-canvas" style="float: left; width: 70%; height: 100%;"></div>
-	
+
 	<div id="control_panel"
 		style="float: right; width: 30%; text-align: left; padding-top: 20px">
 		<div style="margin: 20px; border-width: 2px;">
@@ -127,14 +205,13 @@ html,body,#map-canvas {
 				<option value="San Francisco, CA">San Francisco, CA</option>
 				<option value="Los Angeles, CA">Los Angeles, CA</option>
 			</select> 
-			<br --> 
+			<br -->
 			<input type="submit" onclick="calcRoute();">
 		</div>
 		<div id="directions_panel"
 			style="margin: 20px; background-color: #FFEE77;"></div>
-			
-		<div id="position_panel" 
-		    style="margin: 20px;"></div>
+
+		<div id="position_panel" style="margin: 20px;"></div>
 	</div>
 </body>
 </html>
