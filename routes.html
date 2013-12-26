@@ -52,7 +52,7 @@ html,body,#map-canvas {
 
 		directionsDisplay.setMap(map);
 
-		google.maps.event.addListener(map, 'click', function(event) {
+		google.maps.event.addListener(map, 'mousemove', function(event) {
 			updatePositionInformation(event);
 		});
 
